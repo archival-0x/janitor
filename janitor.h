@@ -5,10 +5,21 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct {
+typedef enum {
+    INT,
+    PAIR
+} Type;
 
+typedef struct {
+        
 
 } janitor_t;
 
-void janitor_start(janitor_t *gc);
-void janitor_stop(janitor_t *gc);
+// Execution of the garbage collector
+static void janitor_start(janitor_t *gc);
+static void janitor_stop(janitor_t *gc);
+
+// Object manipulation
+void * janitor_alloc(janitor_t *gc, size_t size);
+void janitor_free(janitor_t *gc);
+

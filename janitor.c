@@ -1,12 +1,12 @@
-#include "janitor.h>
+#include "janitor.h"
 
-void 
+static void * 
 janitor_start(janitor_t *gc)
 {
 
 }
 
-void 
+static void 
 janitor_stop(janitor_t *gc)
 {
 
