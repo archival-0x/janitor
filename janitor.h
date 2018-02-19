@@ -15,8 +15,20 @@ typedef struct {
 
 } janitor_t;
 
+typedef struct object{
+    u32 marked;
+    size_t size;
+    void * ptr;
+
+    /* Next object, as this is a linked-list */
+    struct object * next;
+
+} JanitorObject;
+
 /* optimized memory allocation */
 // static void * smalloc(size_t size);
+
+/* hashing function for pointer */
 
 /* Execute garbage collection */
 void janitor_start(janitor_t *gc);

@@ -1,5 +1,11 @@
 #include "janitor.h"
 
+static size_t *
+janitor_hash(void *ptr)
+{
+
+}
+
 static void *
 smalloc(size_t size)
 {   
