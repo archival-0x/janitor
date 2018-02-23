@@ -23,6 +23,7 @@ void
 janitor_start(janitor_t *gc)
 {
     gc->nObjects = 0;
+    gc->nFrees = 0;
     gc->maxObjects = JANITOR_INITIAL_GC;
 
 }
@@ -30,5 +31,5 @@ janitor_start(janitor_t *gc)
 void 
 janitor_stop(janitor_t *gc)
 {
-
+    janitor_sweep(gc);
 }
