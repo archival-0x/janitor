@@ -52,7 +52,8 @@ jmalloc(size_t size)
     header->size = size;
     header->flag = 0;
     header->next = NULL;
-
+    
+    /* switch context to next free block */
     if (!head)
         head = header;
     if (tail)
@@ -64,19 +65,61 @@ jmalloc(size_t size)
 }
 
 void *
-jcalloc(void *block, size_t size)
+jcalloc(size_t num, size_t size)
 {
+    size_t total_size;
+    void *block;
 
+    /* check if parameters were provided */
+    if (!num || !size)
+        return NULL;
+
+    /* check if size_t bounds adhere to multiplicative inverse properties */
+    total_size = num * size;
+    if ( size != total_size / num)
+        return NULL;
+    
+    /* perform conventional malloc with total_size */
+    block = jmalloc(total_size);
+    if (!block)
+        return NULL;
+    
+    /* zero out our newly heap allocated block */
+    memset(block, 0, size);
+    return block;
 }
 
 void *
 jrealloc(void *block, size_t size)
 {
+    janitor_t *header;
+    void *ret;
 
+    /* create a new block if parameters not set */
+    if (!block)
+        return jmalloc(size);
+    
+    /* set header to be block's previous bit */ 
+    header = (janitor_t *) block - 1;
+    
+    /* check if headers size is greater than specified paramater */
+    if (header->size >= size)
+        return block;
+
+    /* create a new block allocation */
+    ret = jmalloc(size);
+    
+    /* add content from previous block to newly allocated block */
+    if (ret){
+        memcpy(ret, block, header->size);
+        jfree(block);
+    }
+
+    return ret;
 }
 
 void
-free(void *block)
+jfree(void *block)
 {
     janitor_t *header, *tmp;
     void * programbreak;
@@ -88,7 +131,28 @@ free(void *block)
     header = (janitor_t *) block - 1;
     
     programbreak = sbrk(0);
-    // TODO
+    
+    /* start to NULL out blocks until break point of heap */
+    if (( char *) block + header->size == programbreak){
+        if (head == tail){
+            head = tail = NULL;
+        } else {
+            tmp = head;
+            while (tmp) {
+                if (tmp->next == tail){
+                    tmp->next = NULL;
+                    tail = tmp;
+                }
+                tmp = tmp->next;
+            }
+        }
+
+        sbrk(0 - BLOCKSIZE - header->size);
+        pthread_mutex_unlock(*global_malloc_lock);
+        return NULL;
+    }
+    header->flag = 1;
+    pthread_mutex_unlock(*global_mallo_lock);
 }
 
 

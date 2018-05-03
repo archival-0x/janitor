@@ -14,4 +14,16 @@ typedef janitor_block {
     int flag;
 } janitor_t;
 
+void *
+jmalloc(size_t size);
+
+void *
+jcalloc(size_t num, size_t size);
+
+void *
+jrealloc(void *block, size_t size);
+
+void
+jfree(void *block);
+
 #endif
