@@ -1,11 +1,14 @@
 #include "janitor.h"
 
+// in order to keep track of our head and tail
 janitor_t *head, *tail;
+
+// implement a mutex such that threads do not interfere with memory allocation
 pthread_mutex_t global_malloc_lock;
 
 static janitor_t *
 get_free_block(size_t size)
-{   
+{
     /* set head block as current block */
     janitor_t *current = head;
     while (current) {
@@ -38,7 +41,7 @@ jmalloc(size_t size)
         pthread_mutex_unlock(&global_malloc_lock);
         return (void *) (header + 1);
     }
-    
+
     /* if not found, continue by extending the size of the heap with sbrk, extending the break to meet our allocation */
     total_size = BLOCK_SIZE + size;
     block = sbrk(total_size);
@@ -46,13 +49,13 @@ jmalloc(size_t size)
         pthread_mutex_unlock(&global_malloc_lock);
         return NULL;
     }
-    
+
     /* set struct entries with allocation specification and mark as not free */
     header = block;
     header->size = size;
     header->flag = 0;
     header->next = NULL;
-    
+
     /* switch context to next free block */
     if (!head)
         head = header;
@@ -78,44 +81,15 @@ jcalloc(size_t num, size_t size)
     total_size = num * size;
     if ( size != total_size / num)
         return NULL;
-    
+
     /* perform conventional malloc with total_size */
     block = jmalloc(total_size);
     if (!block)
         return NULL;
-    
+
     /* zero out our newly heap allocated block */
     memset(block, 0, size);
     return block;
-}
-
-void *
-jrealloc(void *block, size_t size)
-{
-    janitor_t *header;
-    void *ret;
-
-    /* create a new block if parameters not set */
-    if (!block)
-        return jmalloc(size);
-    
-    /* set header to be block's previous bit */ 
-    header = (janitor_t *) block - 1;
-    
-    /* check if headers size is greater than specified paramater */
-    if (header->size >= size)
-        return block;
-
-    /* create a new block allocation */
-    ret = jmalloc(size);
-    
-    /* add content from previous block to newly allocated block */
-    if (ret){
-        memcpy(ret, block, header->size);
-        jfree(block);
-    }
-
-    return ret;
 }
 
 void
@@ -126,13 +100,13 @@ jfree(void *block)
 
     if (!block)
         return NULL;
-    
+
     pthread_mutex_lock(&global_malloc_lock);
     header = (janitor_t *) block - 1;
-    
+
     programbreak = sbrk(0);
-    
-    /* start to NULL out blocks until break point of heap */
+
+    /* start to NULL out block until break point of heap */
     if (( char *) block + header->size == programbreak){
         if (head == tail){
             head = tail = NULL;
@@ -152,7 +126,34 @@ jfree(void *block)
         return NULL;
     }
     header->flag = 1;
-    pthread_mutex_unlock(*global_mallo_lock);
+    pthread_mutex_unlock(*global_malloc_lock);
 }
 
+void *
+jrealloc(void *block, size_t size)
+{
+    janitor_t *header;
+    void *ret;
 
+    /* create a new block if parameters not set */
+    if (!block)
+        return jmalloc(size);
+
+    /* set header to be block's previous bit */
+    header = (janitor_t *) block - 1;
+
+    /* check if headers size is greater than specified paramater */
+    if (header->size >= size)
+        return block;
+
+    /* create a new block allocation */
+    ret = jmalloc(size);
+
+    /* add content from previous block to newly allocated block */
+    if (ret){
+        memcpy(ret, block, header->size);
+        jfree(block);
+    }
+
+    return ret;
+}
