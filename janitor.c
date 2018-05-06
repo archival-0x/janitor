@@ -75,17 +75,17 @@ jcalloc(size_t num, size_t size)
 
     /* check if parameters were provided */
     if (!num || !size)
-        return NULL;
+        return (void *) NULL;
 
     /* check if size_t bounds adhere to multiplicative inverse properties */
     total_size = num * size;
     if ( size != total_size / num)
-        return NULL;
+        return (void *) NULL;
 
     /* perform conventional malloc with total_size */
     block = jmalloc(total_size);
     if (!block)
-        return NULL;
+        return (void *) NULL;
 
     /* zero out our newly heap allocated block */
     memset(block, 0, size);
@@ -99,7 +99,7 @@ jfree(void *block)
     void * programbreak;
 
     if (!block)
-        return NULL;
+        return (void) NULL;
 
     pthread_mutex_lock(&global_malloc_lock);
     header = (janitor_t *) block - 1;
@@ -121,12 +121,12 @@ jfree(void *block)
             }
         }
 
-        sbrk(0 - BLOCKSIZE - header->size);
-        pthread_mutex_unlock(*global_malloc_lock);
-        return NULL;
+        sbrk(0 - BLOCK_SIZE - header->size);
+        pthread_mutex_unlock(&global_malloc_lock);
+        return (void) NULL;
     }
     header->flag = 1;
-    pthread_mutex_unlock(*global_malloc_lock);
+    pthread_mutex_unlock(&global_malloc_lock);
 }
 
 void *
