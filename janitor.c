@@ -24,14 +24,16 @@ get_free_block(size_t size)
 void *
 jmalloc(size_t size)
 {
-    size_t total_size;
-    void *block;
-    janitor_t *header;
+    /* define our static variables */
+    size_t total_size;  // represents total size of linked list
+    void *block;        // current block in context
+    janitor_t *header;  // current context block
 
     /* error-check size */
     if (!size)
         return NULL;
 
+    /* critical section start */
     pthread_mutex_lock(&global_malloc_lock);
 
     /* first-fit: check if there already is a block size that meets our allocation size and immediately fill it and return */
@@ -56,15 +58,22 @@ jmalloc(size_t size)
     header->flag = 0;
     header->next = NULL;
 
-    /* switch context to next free block */
+    /* switch context to next free block
+        - if there is no head block for the list, set header as head
+        - if a tail block is present, set the next element to point to header, now the new tail
+    */
     if (!head)
         head = header;
     if (tail)
         tail->next = header;
 
     tail = header;
+
+    /* unlock critical section */
     pthread_mutex_unlock(&global_malloc_lock);
-    return (void *)(header - 1);
+
+    /* returned memory after break */
+    return (void *)(header + 1);
 }
 
 void *
@@ -95,38 +104,58 @@ jcalloc(size_t num, size_t size)
 void
 jfree(void *block)
 {
-    janitor_t *header, *tmp;
-    void * programbreak;
+  janitor_t *header, *tmp;
+  void * programbreak;
 
-    if (!block)
-        return (void) NULL;
+  /* if the block is provided */
+  if (!block)
+      return (void) NULL;
 
-    pthread_mutex_lock(&global_malloc_lock);
-    header = (janitor_t *) block - 1;
+  /* start critical section */
+  pthread_mutex_lock(&global_malloc_lock);
 
-    programbreak = sbrk(0);
+  /* set header as previous bloc
+  header = (janitor_t *) block - 1;
 
-    /* start to NULL out block until break point of heap */
-    if (( char *) block + header->size == programbreak){
-        if (head == tail){
-            head = tail = NULL;
-        } else {
-            tmp = head;
-            while (tmp) {
-                if (tmp->next == tail){
-                    tmp->next = NULL;
-                    tail = tmp;
-                }
-                tmp = tmp->next;
-            }
-        }
+  /* start programbreak at byte 0 */
+  programbreak = sbrk(0);
 
-        sbrk(0 - BLOCK_SIZE - header->size);
-        pthread_mutex_unlock(&global_malloc_lock);
-        return (void) NULL;
-    }
-    header->flag = 1;
-    pthread_mutex_unlock(&global_malloc_lock);
+  /* start to NULL out block until break point of heap
+      - header (previous block) size + target block should meet
+  */
+  if (( char *) block + header->size == programbreak){
+
+      /* check if block is only allocated block (since it is both head and tail), and NULL */
+      if (head == tail){
+          head = tail = NULL;
+      } else {
+
+          /* copy head into tmp block, NULL each block from tail back to head */
+          tmp = head;
+          while (tmp) {
+              if (tmp->next == tail){
+                  tmp->next = NULL;
+                  tail = tmp;
+              }
+              tmp = tmp->next;
+          }
+      }
+
+      /* move break back to memory address after deallocation */
+      sbrk(0 - BLOCK_SIZE - header->size);
+
+      /* unlock critical section*/
+      pthread_mutex_unlock(&global_malloc_lock);
+
+      /* returns nothing */
+      return (void) NULL;
+  }
+
+  /* set flag to unmarked */
+  header->flag = 1;
+
+  /* unlock critical section */
+  pthread_mutex_unlock(&global_malloc_lock);
 }
 
 void *
